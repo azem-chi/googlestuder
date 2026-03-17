@@ -1,8 +1,9 @@
 /* ══════ STATE ══════ */
-/* ══════ SHARED API KEY — ضع مفتاح Groq المشترك هنا ══════ */
-/* ضع مفتاح Groq المشترك هنا — سيُستخدم لجميع المستخدمين */
-/* مثال: const SHARED_GROQ_KEY = ''; */
-const SHARED_GROQ_KEY = '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';
+/* ══════ SHARED API KEY — سيُستخدم لجميع المستخدمين إذا توفر ══════ */
+const SHARED_GROQ_KEY = process.env.GROQ_API_KEY || '';
+const SHARED_GEMINI_KEY = process.env.GEMINI_API_KEY || '';
+window.SHARED_GROQ_KEY = SHARED_GROQ_KEY;
+window.SHARED_GEMINI_KEY = SHARED_GEMINI_KEY;
 
 let S = {
   currentDay:1, completedDays:[], calories:0, streak:0, lang:'',
@@ -20,6 +21,7 @@ let S = {
   trainingLog: {},
   coachHistory: []
 };
+window.S = S;
 function loadState(){try{
   // Migrate from old fitpulse_S key if exists
   const old=localStorage.getItem('fitpulse_S');
@@ -32,6 +34,7 @@ function loadState(){try{
 function saveState(){
   try {
     localStorage.setItem('azem_S', JSON.stringify(S));
+    S._localTs = Date.now();
   } catch(e) {
     // FIX#4: QuotaExceededError — strip heavy data and retry
     try {

@@ -60,7 +60,13 @@ function closeSession() {
 }
 function confirmCloseSession() {
   const msg = currentLang==='en' ? 'End the session?' : currentLang==='fr' ? 'Terminer la séance?' : 'هل تريد إنهاء الجلسة؟';
-  if (confirm(msg)) closeSession();
+  const title = currentLang==='en' ? 'End Session' : currentLang==='fr' ? 'Terminer la séance' : 'إنهاء الجلسة';
+  
+  if (typeof showConfirmModal === 'function') {
+    showConfirmModal(title, msg, closeSession);
+  } else {
+    closeSession();
+  }
 }
 function buildSessTrack() {
   const track = document.getElementById('sess-track');

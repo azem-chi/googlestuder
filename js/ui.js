@@ -215,6 +215,31 @@ function showMiniToast(msg) {
   toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
 }
 
+/**
+ * بديل لـ confirm() يعمل داخل الـ iframe
+ */
+function showConfirmModal(title, body, onConfirm) {
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;z-index:30000;background:rgba(0,0,0,.8);backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center;padding:20px;';
+  modal.innerHTML = `
+    <div style="background:var(--dark);border-radius:28px;width:100%;max-width:400px;padding:30px;border:1px solid rgba(255,255,255,.1);box-shadow:0 25px 50px rgba(0,0,0,.5);text-align:center;">
+      <div style="font-size:20px;font-weight:900;color:var(--gold);margin-bottom:15px;">${title}</div>
+      <div style="font-size:14px;color:var(--dim);line-height:1.6;margin-bottom:25px;">${body.replace(/\n/g, '<br>')}</div>
+      <div style="display:flex;gap:12px;">
+        <button id="confirm-cancel" style="flex:1;padding:14px;border-radius:16px;background:rgba(255,255,255,.05);color:var(--txt);border:none;font-weight:700;cursor:pointer;">إلغاء</button>
+        <button id="confirm-ok" style="flex:1;padding:14px;border-radius:16px;background:var(--gold);color:var(--night);border:none;font-weight:900;cursor:pointer;">تأكيد</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.querySelector('#confirm-cancel').onclick = () => modal.remove();
+  modal.querySelector('#confirm-ok').onclick = () => {
+    modal.remove();
+    if (typeof onConfirm === 'function') onConfirm();
+  };
+}
+window.showConfirmModal = showConfirmModal;
+
 /* ══════ PWA ══════ */
 let deferredPrompt = null;
 // Handle browser Back button during session

@@ -185,35 +185,57 @@ function switchProgram(prog) {
     : currentLang==='fr'
       ? `Passer au programme ${progName}?\nLe jour sera remis à 1.`
       : `هل تريد التبديل لبرنامج ${progName}?\nسيعود اليوم الحالي إلى 1.`;
-  if (!confirm(confirm1)) return;
-  const hasProgress = (S.completedDays||[]).length > 3;
-  if (hasProgress) {
-    const confirm2 = currentLang==='en'
-      ? `⚠️ Warning: You have ${S.completedDays.length} completed days.\nAre you sure? This cannot be undone.`
-      : currentLang==='fr'
-        ? `⚠️ Attention: Vous avez ${S.completedDays.length} jours complétés.\nÊtes-vous sûr? Impossible d'annuler.`
-        : `⚠️ تنبيه: لديك ${S.completedDays.length} يوماً مكتملاً.\nهل أنت متأكد؟ لا يمكن التراجع.`;
-    if (!confirm(confirm2)) return;
-  }
-  // Backup current progress
-  S._programBackup = {
-    program: S.user?.program,
-    programDays: S.user?.programDays,
-    currentDay: S.currentDay,
-    completedDays: [...(S.completedDays||[])],
-    calories: S.calories,
-    streak: S.streak,
-    backedUpAt: Date.now()
+
+  const proceed = () => {
+    const hasProgress = (S.completedDays||[]).length > 3;
+    if (hasProgress) {
+      const confirm2 = currentLang==='en'
+        ? `⚠️ Warning: You have ${S.completedDays.length} completed days.\nAre you sure? This cannot be undone.`
+        : currentLang==='fr'
+          ? `⚠️ Attention: Vous avez ${S.completedDays.length} jours complétés.\nÊtes-vous sûr? Impossible d'annuler.`
+          : `⚠️ تنبيه: لديك ${S.completedDays.length} يوماً مكتملاً.\nهل أنت متأكد؟ لا يمكن التراجع.`;
+      
+      if (typeof showConfirmModal === 'function') {
+        showConfirmModal('⚠️ تنبيه', confirm2, executeSwitch);
+      } else {
+        executeSwitch();
+      }
+    } else {
+      executeSwitch();
+    }
   };
-  if (!S.user) S.user = {};
-  S.user.program = prog;
-  S.user.programDays = prog === 'beginner' ? 21 : 30;
-  S.currentDay = 1;
-  S.completedDays = [];
-  S.completedExercises = {};
-  S.calories = 0;
-  S.streak = 0;
-  saveState();
+
+  if (typeof showConfirmModal === 'function') {
+    showConfirmModal('🔄 تبديل البرنامج', confirm1, proceed);
+  } else {
+    proceed();
+  }
+
+  function executeSwitch() {
+    // Backup current progress
+    S._programBackup = {
+      program: S.user?.program,
+      programDays: S.user?.programDays,
+      currentDay: S.currentDay,
+      completedDays: [...(S.completedDays||[])],
+      calories: S.calories,
+      streak: S.streak,
+      backedUpAt: Date.now()
+    };
+    if (!S.user) S.user = {};
+    S.user.program = prog;
+    S.user.programDays = prog === 'beginner' ? 21 : 30;
+    S.currentDay = 1;
+    S.completedDays = [];
+    S.calories = 0;
+    S.streak = 0;
+    saveState();
+    render();
+    showMiniToast('✅ ' + (currentLang==='en'?'Program switched!':currentLang==='fr'?'Programme changé!':'تم تبديل البرنامج!'));
+  }
+}
+
+function updateProgramDesc(prog) {
   const pgmDesc = document.getElementById('pgm-desc');
   if (pgmDesc) pgmDesc.textContent = prog==='beginner'
     ? (currentLang==='en'?'🌱 Gentle beginner program: 3 training days × 4 weeks, lighter exercises with rest.':currentLang==='fr'?'🌱 Programme débutant: 3 jours entraînement × 4 semaines, exercices légers.':'🌱 برنامج مريح للبدء: 3 أيام تدريب × 4 أسابيع، تمارين أخف وراحة كافية.')

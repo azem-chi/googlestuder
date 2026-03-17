@@ -1,3 +1,5 @@
+import { GoogleGenAI } from "@google/genai";
+
 /* ══════════════════════════════════════════
    LOCAL AI COACH ENGINE
    يعمل بدون API Key — ردود ذكية تعتمد على بيانات المستخدم
@@ -253,6 +255,42 @@ ${suggestion}`;
 }
 
 /* ══════════════════════════════════════════
+   GEMINI AI COACH ENGINE
+══════════════════════════════════════════ */
+async function geminiCoachReply(sys, history, apiKey) {
+  try {
+    const ai = new GoogleGenAI({ apiKey });
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: history.map(m => ({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: Array.isArray(m.content) 
+          ? m.content.map(p => {
+              if (p.type === 'text') return { text: p.text };
+              if (p.type === 'image_url') {
+                const base64 = p.image_url.url.split(',')[1];
+                const mimeType = p.image_url.url.split(';')[0].split(':')[1];
+                return { inlineData: { data: base64, mimeType } };
+              }
+              return { text: '' };
+            })
+          : [{ text: m.content }]
+      })),
+      config: {
+        systemInstruction: sys,
+        temperature: 0.7,
+        maxOutputTokens: 1200,
+      }
+    });
+
+    return response.text || 'لم أتمكن من الرد.';
+  } catch (e) {
+    console.error('Gemini Error:', e);
+    throw e;
+  }
+}
+
+/* ══════════════════════════════════════════
    AI COACH
 ══════════════════════════════════════════ */
 function openAICoach() {
@@ -324,14 +362,27 @@ function renderCoach() {
             const tp = m.content.find(p=>p.type==='text'); dispText = tp?.text||'';
             const ip = m.content.find(p=>p.type==='image_url'); dispImg = ip?.image_url?.url;
           } else { dispText = m.content || ''; }
-          // FIX XSS: sanitize user messages before innerHTML rendering
-          const safeText = m.role === 'user'
-            ? dispText.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
-            : dispText;
-          const formattedText = safeText
-            .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
-            .replace(/\*(.+?)\*/g,'<em>$1</em>')
-            .replace(/^• /gm,'<span style="color:var(--gold);">•</span> ');
+          // FIX XSS: sanitize messages before innerHTML rendering
+          const sanitize = (str) => {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+          };
+          
+          let safeText = '';
+          if (m.role === 'user') {
+            safeText = sanitize(dispText);
+          } else {
+            // For assistant, we allow some formatting but sanitize the rest
+            // This is a basic approach; a real Markdown parser would be better
+            safeText = dispText
+              .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') // Basic escape
+              .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+              .replace(/\*(.+?)\*/g,'<em>$1</em>')
+              .replace(/^• /gm,'<span style="color:var(--gold);">•</span> ');
+          }
+
+          const formattedText = safeText;
           const msgId = 'cmsg-' + idx;
           const isLong = formattedText.length > 600 && m.role === 'assistant';
           const textHtml = formattedText ? `<div id="${msgId}" style="padding:10px 14px;font-size:13px;line-height:1.8;color:var(--txt);white-space:pre-wrap;${isLong?'max-height:220px;overflow:hidden;mask-image:linear-gradient(to bottom,black 60%,transparent 100%);-webkit-mask-image:linear-gradient(to bottom,black 60%,transparent 100%);':''}">${formattedText}</div>${isLong?`<button onclick="(function(el,btn){el.style.maxHeight='';el.style.maskImage='';el.style.webkitMaskImage='';btn.style.display='none';})(document.getElementById('${msgId}'),this)" style="width:100%;padding:6px;background:none;border-none;border-top:1px solid var(--border);color:var(--gold);font-size:11px;font-family:'Cairo',sans-serif;cursor:pointer;">▼ اقرأ أكثر</button>`:''}` : '';
@@ -487,7 +538,9 @@ async function coachSend() {
   if (freshBtn) { freshBtn.textContent = '⏳'; freshBtn.disabled = true; }
   setTimeout(()=>{const m=document.getElementById('coach-msgs');if(m)m.scrollTop=m.scrollHeight;},80);
 
-  const apiKey = S.apiKey || (typeof SHARED_GROQ_KEY !== 'undefined' ? SHARED_GROQ_KEY : '') || '';
+  const apiKey = S.apiKey || (typeof SHARED_GEMINI_KEY !== 'undefined' ? SHARED_GEMINI_KEY : '') || (typeof SHARED_GROQ_KEY !== 'undefined' ? SHARED_GROQ_KEY : '') || '';
+  const isGemini = apiKey.startsWith('AIza') || (S.apiKey && S.apiKey.startsWith('AIza')) || (typeof SHARED_GEMINI_KEY !== 'undefined' && SHARED_GEMINI_KEY.startsWith('AIza'));
+
   if (!apiKey) {
     // ── Local AI Engine — smart offline coach ──
     if (hasPdf) {
@@ -722,47 +775,52 @@ ${_T('التمارين المخصصة:','Custom exercises:','Exercices personnal
 - ${_T('إذا شكا من ألم: أوصِ بالراحة أو الطبيب','If pain complaint: recommend rest or doctor','Si douleur: recommander repos ou médecin')}
 - ${_T('إذا كان متحمساً: أضف تحدياً','If enthusiastic: add a challenge','Si enthousiaste: ajouter un défi')}`;
   try {
-    const _ctrl = new AbortController();
-    const _timeout = setTimeout(() => _ctrl.abort(), 30000);
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      signal: _ctrl.signal,
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + apiKey
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile', // ✅ نموذج ثابت وموثوق
-        max_tokens: 1200,
-        temperature: 0.65,
-        messages: [
-          {role:'system', content: sys},
-          ...S.coachHistory.map((m, idx) => {
-            // نحتفظ بآخر صورة وآخر PDF في السياق
-            const isLast = idx === S.coachHistory.length - 1;
-            if (Array.isArray(m.content)) {
-              // آخر صورة: أبقِها كاملة
-              const hasImg = m.content.find(p=>p.type==='image_url');
-              const hasPdf = m.content.find(p=>p.type==='document');
-              if ((hasImg || hasPdf) && m.role === 'user') {
-                // تحقق إذا هي آخر رسالة تحتوي صورة/PDF
-                const lastMediaIdx = S.coachHistory.reduce((last, mm, i) => {
-                  return Array.isArray(mm.content) && mm.content.find(p=>p.type==='image_url'||p.type==='document') ? i : last;
-                }, -1);
-                if (idx === lastMediaIdx) return {role:m.role, content:m.content};
+    let reply = '';
+    if (isGemini) {
+      reply = await geminiCoachReply(sys, S.coachHistory, apiKey);
+    } else {
+      const _ctrl = new AbortController();
+      const _timeout = setTimeout(() => _ctrl.abort(), 30000);
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        signal: _ctrl.signal,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + apiKey
+        },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile', // ✅ نموذج ثابت وموثوق
+          max_tokens: 1200,
+          temperature: 0.65,
+          messages: [
+            {role:'system', content: sys},
+            ...S.coachHistory.map((m, idx) => {
+              // نحتفظ بآخر صورة وآخر PDF في السياق
+              const isLast = idx === S.coachHistory.length - 1;
+              if (Array.isArray(m.content)) {
+                // آخر صورة: أبقِها كاملة
+                const hasImg = m.content.find(p=>p.type==='image_url');
+                const hasPdf = m.content.find(p=>p.type==='document');
+                if ((hasImg || hasPdf) && m.role === 'user') {
+                  // تحقق إذا هي آخر رسالة تحتوي صورة/PDF
+                  const lastMediaIdx = S.coachHistory.reduce((last, mm, i) => {
+                    return Array.isArray(mm.content) && mm.content.find(p=>p.type==='image_url'||p.type==='document') ? i : last;
+                  }, -1);
+                  if (idx === lastMediaIdx) return {role:m.role, content:m.content};
+                }
+                const t = m.content.find(p=>p.type==='text');
+                return {role:m.role, content: t?.text || '📷 [صورة]'};
               }
-              const t = m.content.find(p=>p.type==='text');
-              return {role:m.role, content: t?.text || '📷 [صورة]'};
-            }
-            return {role:m.role, content:m.content};
-          })
-        ]
-      })
-    });
-    clearTimeout(_timeout);
-    const data = await res.json();
-    if (data.error) throw new Error(data.error.message || 'خطأ في الـ API');
-    let reply = data.choices?.[0]?.message?.content || 'لم أتمكن من الرد.';
+              return {role:m.role, content:m.content};
+            })
+          ]
+        })
+      });
+      clearTimeout(_timeout);
+      const data = await res.json();
+      if (data.error) throw new Error(data.error.message || 'خطأ في الـ API');
+      reply = data.choices?.[0]?.message?.content || 'لم أتمكن من الرد.';
+    }
 
     // Execute all FITCMD blocks in the response
     let execCount = 0;
@@ -1457,16 +1515,23 @@ function saveExEditor() {
 function deleteExFromDay() {
   const id = document.getElementById('ex-editor-id').value;
   const day = parseInt(document.getElementById('ex-editor-day').value);
-  if (!confirm('حذف هذا التمرين من اليوم؟')) return;
-  if (!S.customSchedule) S.customSchedule = {};
-  // FIX-I: use S.customSchedule directly, not legacy customSchedule
-  const sched = S.customSchedule[day] || getDaySchedule(day).exercises.map(e=>e.id);
-  S.customSchedule[day] = sched.filter(i=>i!==id);
-  customSchedule[day] = S.customSchedule[day]; // keep legacy in sync
-  saveState();
-  closeExEditor();
-  renderWorkoutTab();
-  showMiniToast('🗑️ تم الحذف');
+  
+  const proceed = () => {
+    if (!S.customSchedule) S.customSchedule = {};
+    const sched = S.customSchedule[day] || getDaySchedule(day).exercises.map(e=>e.id);
+    S.customSchedule[day] = sched.filter(i=>i!==id);
+    if (typeof customSchedule !== 'undefined') customSchedule[day] = S.customSchedule[day];
+    saveState();
+    closeExEditor();
+    renderWorkoutTab();
+    showMiniToast('🗑️ تم الحذف');
+  };
+
+  if (typeof showConfirmModal === 'function') {
+    showConfirmModal('🗑️ حذف تمرين', 'هل أنت متأكد من حذف هذا التمرين من اليوم؟', proceed);
+  } else {
+    proceed();
+  }
 }
 
 function addExToDay(exId, day) {
@@ -1600,6 +1665,21 @@ function startTutorial() {
   tutStep = 0;
   renderTutStep();
 }
+
+// Expose functions to window for Vanilla JS compatibility
+window.openAICoach = openAICoach;
+window.closeCoachModal = closeCoachModal;
+window.renderCoach = renderCoach;
+window.clearCoachHistory = clearCoachHistory;
+window.coachAsk = coachAsk;
+window.coachImgSelected = coachImgSelected;
+window.coachClearImg = coachClearImg;
+window.coachPdfSelected = coachPdfSelected;
+window.coachSend = coachSend;
+window.coachExecCmd = coachExecCmd;
+window.startTutorial = startTutorial;
+window.tutNext = tutNext;
+window.endTutorial = endTutorial;
 
 function tutNext() {
   tutStep++;

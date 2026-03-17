@@ -10,18 +10,67 @@ import { getFirestore, doc, setDoc, getDoc, deleteDoc }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
 const firebaseConfig = {
-  apiKey:            "AIzaSyBFsVUEIaWDzFXysWOOTA83WKblPuLj5ik",
-  authDomain:        "azem-b93d0.firebaseapp.com",
-  projectId:         "azem-b93d0",
-  storageBucket:     "azem-b93d0.firebasestorage.app",
-  messagingSenderId: "703648049841",
-  appId:             "1:703648049841:web:bcecfafa69bb7a73485090",
+  apiKey:            process.env.FIREBASE_API_KEY || "AIzaSyBFsVUEIaWDzFXysWOOTA83WKblPuLj5ik",
+  authDomain:        process.env.FIREBASE_AUTH_DOMAIN || "azem-b93d0.firebaseapp.com",
+  projectId:         process.env.FIREBASE_PROJECT_ID || "azem-b93d0",
+  storageBucket:     process.env.FIREBASE_STORAGE_BUCKET || "azem-b93d0.firebasestorage.app",
+  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || "703648049841",
+  appId:             process.env.FIREBASE_APP_ID || "1:703648049841:web:bcecfafa69bb7a73485090",
   measurementId:     "G-XXE47BMBT8"
 };
 
 const app  = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db   = getFirestore(app);
+
+// ══════════════════════════════════════════
+// Error Handling Spec for Firestore Permissions
+// ══════════════════════════════════════════
+const OperationType = {
+  CREATE: 'create',
+  UPDATE: 'update',
+  DELETE: 'delete',
+  LIST: 'list',
+  GET: 'get',
+  WRITE: 'write',
+};
+
+function handleFirestoreError(error, operationType, path) {
+  const errInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData.map(provider => ({
+        providerId: provider.providerId,
+        displayName: provider.displayName,
+        email: provider.email,
+        photoUrl: provider.photoURL
+      })) || []
+    },
+    operationType,
+    path
+  };
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  // Show user-friendly message
+  if (typeof showMiniToast === 'function') {
+    if (errInfo.error.includes('insufficient permissions')) {
+      showMiniToast('⚠️ خطأ في الصلاحيات. يرجى تسجيل الدخول مجدداً.');
+    } else {
+      showMiniToast('⚠️ خطأ في الاتصال بالسحابة.');
+    }
+  }
+  throw new Error(JSON.stringify(errInfo));
+}
+
+// Global Error Listener (Simple Error Boundary)
+window.addEventListener('error', (event) => {
+  console.error('Global Error caught:', event.error);
+  // Optional: show UI error state
+});
 
 let _fbUid        = null;
 let _syncDebounce = null;
@@ -106,9 +155,9 @@ async function saveUserProfile(user, extraData) {
       ...extraData
     };
     await setDoc(doc(db, 'users', user.uid), { profile }, { merge: true });
-    // إرسال فوري إلى Google Sheets
-    sendToSheets(user, extraData);
-  } catch(e) { console.warn('saveUserProfile error:', e); }
+  } catch(e) { 
+    handleFirestoreError(e, OperationType.WRITE, 'users/' + user.uid);
+  }
 }
 
 // ══════════════════════════════════════════
@@ -124,7 +173,9 @@ async function pushToCloud() {
     await setDoc(doc(db, 'users', _fbUid), { state: payload }, { merge: true });
     const el = document.getElementById('firebase-sync-status');
     if (el) el.textContent = '✅ مزامن · ' + new Date().toLocaleTimeString('ar-SA');
-  } catch(e) { console.warn('Firebase push error:', e); }
+  } catch(e) { 
+    handleFirestoreError(e, OperationType.WRITE, 'users/' + _fbUid);
+  }
 }
 
 async function pullFromCloud(uid) {
@@ -164,7 +215,10 @@ async function pullFromCloud(uid) {
       await pushToCloud();
     }
     return false;
-  } catch(e) { console.warn('Firebase pull error:', e); return false; }
+  } catch(e) { 
+    handleFirestoreError(e, OperationType.GET, 'users/' + uid);
+    return false; 
+  }
 }
 
 // FIX: كشف pushToCloud و pullFromCloud للملفات غير الـ module
@@ -497,27 +551,35 @@ window.openSettingsSheet = function() {
 // حذف جميع بيانات المستخدم (Firestore + localStorage)
 // ══════════════════════════════════════════
 window.deleteAllUserData = async function() {
-  const confirmed1 = confirm('⚠️ هل أنت متأكد من حذف جميع بياناتك نهائياً؟\n\nسيتم حذف:\n• بياناتك من هذا الجهاز\n• بياناتك من السحابة (Firestore)\n\nلا يمكن التراجع عن هذا الإجراء.');
-  if (!confirmed1) return;
-  const confirmed2 = confirm('⛔ تأكيد أخير: سيتم حذف كل بياناتك نهائياً. متأكد؟');
-  if (!confirmed2) return;
-
-  try {
-    // 1. حذف من Firestore
-    if (_fbUid) {
-      await deleteDoc(doc(db, 'users', _fbUid));
-    }
-  } catch(e) {
-    console.warn('Firestore delete error:', e);
+  const title = '⚠️ حذف جميع البيانات';
+  const body = 'هل أنت متأكد من حذف جميع بياناتك نهائياً؟\n\nسيتم حذف:\n• بياناتك من هذا الجهاز\n• بياناتك من السحابة (Firestore)\n\nلا يمكن التراجع عن هذا الإجراء.';
+  
+  if (typeof showConfirmModal !== 'function') {
+    proceed();
+  } else {
+    showConfirmModal(title, body, () => {
+      showConfirmModal('⛔ تأكيد أخير', 'سيتم حذف كل بياناتك نهائياً. متأكد؟', proceed);
+    });
   }
 
-  // 2. حذف localStorage كاملاً
-  localStorage.clear();
+  async function proceed() {
+    try {
+      // 1. حذف من Firestore
+      if (_fbUid) {
+        await deleteDoc(doc(db, 'users', _fbUid));
+      }
+    } catch(e) {
+      handleFirestoreError(e, OperationType.DELETE, 'users/' + _fbUid);
+    }
 
-  // 3. إعادة تشغيل
-  if (typeof showMiniToast === 'function') showMiniToast('✅ تم حذف جميع البيانات');
-  setTimeout(() => {
-    if (typeof closeSettingsSheet === 'function') closeSettingsSheet();
-    location.reload();
-  }, 1200);
+    // 2. حذف localStorage كاملاً
+    localStorage.clear();
+
+    // 3. إعادة تشغيل
+    if (typeof showMiniToast === 'function') showMiniToast('✅ تم حذف جميع البيانات');
+    setTimeout(() => {
+      if (typeof closeSettingsSheet === 'function') closeSettingsSheet();
+      location.reload();
+    }, 1200);
+  }
 };
