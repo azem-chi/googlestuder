@@ -1,5 +1,5 @@
 {
-  "name": "",
-  "description": "",
-  "requestFramePermissions": []
+  "name": "AZEM (عزم)",
+  "description": "تطبيق لياقة بدنية شخصي متكامل مع مدرب ذكاء اصطناعي، يعمل بدون إنترنت ويوفر برامج تدريب وتتبع للتقدم.",
+  "requestFramePermissions": ["geolocation"]
 }

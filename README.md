@@ -1,20 +1,125 @@
+<div dir="rtl">
+
+# ⚡ عزم — AZEM
+
 <div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+
+<img src="icon-192.png" width="120" alt="AZEM Logo"/>
+
+### تطبيق لياقة بدنية شخصي — بدون إنترنت، بدون اشتراك
+
+[![تجربة مباشرة](https://img.shields.io/badge/🚀_تجربة_مباشرة-GitHub_Pages-FFD700?style=for-the-badge)](https://USERNAME.github.io/azem/)
+![PWA](https://img.shields.io/badge/PWA-Offline_Ready-4CAF50?style=for-the-badge)
+![No Framework](https://img.shields.io/badge/Vanilla_JS-No_Framework-blue?style=for-the-badge)
+
 </div>
 
-# Run and deploy your AI Studio app
+---
 
-This contains everything you need to run your app locally.
+## ما هو عزم؟
 
-View your app in AI Studio: https://ai.studio/apps/514ba14b-2e06-4be1-9181-cbd9164356c3
+**عزم** تطبيق ويب تقدمي (PWA) للياقة البدنية يعمل على أي جهاز دون تثبيت. المستخدم يختار مدة برنامجه (15 أو 30 أو 60 يوماً أو مخصص)، ويحدد هدفه، ويبدأ فوراً.
 
-## Run Locally
+---
 
-**Prerequisites:**  Node.js
+## ✨ المميزات
 
+### 🏋️ التدريب
+- **16 تمرين** بصور متحركة — بيربيز، ضغط، قرفصاء، بلانك، نط الحبل، متسلق الجبل وغيرها
+- **جلسة موجهة** مع عداد تنازلي، مجموعات، راحة تلقائية بين التمارين
+- **تحميل تدريجي** — التكرارات تزيد تلقائياً كل أسبوع
+- **جدول مخصص** — أضف أو عدّل تمارين أي يوم
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+### ⏱️ الأدوات
+- **مؤقت** مع حلقة بصرية
+- **تاباتا** — دورات عمل/راحة تلقائية كاملة
+- **نط الحبل** — عداد قفزات وسعرات في الوقت الفعلي
+
+### 📊 التتبع
+- سجل يومي بالسعرات والمدة والتمارين
+- سلاسل الأيام المتواصلة
+- مقارنة أسبوعية وتقويم شهري
+- شارات الإنجاز (10 شارات)
+- إحصاءات ذكية
+
+### 🤖 المدرب الذكي
+- مدعوم بـ **Groq AI** (llama-3.3-70b)
+- يحلل سجلك ويعطي نصائح شخصية
+- يدعم الصور (llama-4-scout للرؤية)
+- يتحكم في التطبيق عبر أوامر مخفية (FITCMD)
+
+### 🎨 التخصيص
+
+| الثيمات (7) | أوضاع العرض (3) | اللغات (3) |
+|-------------|-----------------|------------|
+| 🌙 رمضاني | 📱 موبايل | العربية |
+| 🔥 ناري | 🖥️ كمبيوتر | English |
+| 🌊 بحري | 📺 تلفزيون | Français |
+| 🌿 طبيعي | | |
+| ⚡ نيون | | |
+| 💜 بنفسجي | | |
+| 🤍 فاتح | | |
+
+---
+
+## 🚀 التثبيت
+
+### على الهاتف
+1. افتح الرابط في Chrome أو Safari
+2. اضغط **"إضافة إلى الشاشة الرئيسية"**
+3. يعمل بدون إنترنت ✅
+
+### على الكمبيوتر
+1. افتح الرابط في Chrome أو Edge
+2. اضغط أيقونة التثبيت في شريط العنوان
+3. يعمل كتطبيق مستقل ✅
+
+---
+
+## 📴 هل يعمل أوفلاين؟
+
+**نعم** — بعد أول زيارة، الـ Service Worker يحفظ جميع الملفات محلياً. التطبيق يعمل بالكامل بدون إنترنت.
+
+> الاستثناء الوحيد: **المدرب الذكي** يحتاج اتصالاً بـ Groq API.
+
+---
+
+## 🤖 إعداد المدرب الذكي (اختياري)
+
+1. احصل على مفتاح مجاني من [console.groq.com/keys](https://console.groq.com/keys)
+2. افتح **الإعدادات ⚙️** داخل التطبيق
+3. أدخل المفتاح في حقل **"مفتاح Groq API"** ← احفظ
+
+---
+
+## 📁 الملفات
+
+```
+azem/
+├── index.html       # التطبيق كاملاً (Vanilla JS)
+├── gifs.js          # صور التمارين المتحركة (base64)
+├── sw.js            # Service Worker
+├── manifest.json    # إعدادات PWA
+├── icon-192.png     # أيقونة
+└── icon-512.png     # أيقونة كبيرة
+```
+
+---
+
+## ⚙️ التقنيات
+
+- **Vanilla JS** بدون أي framework
+- **Web Audio API** للأصوات
+- **Service Worker** للعمل أوفلاين
+- **localStorage** لحفظ كل البيانات محلياً
+- **Groq API** للمدرب الذكي
+
+---
+
+<div align="center">
+
+**⚡ عزم — ابدأ اليوم**
+
+</div>
+
+</div>
